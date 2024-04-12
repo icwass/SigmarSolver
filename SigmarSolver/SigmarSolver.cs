@@ -26,6 +26,7 @@ public class MainClass : QuintessentialMod
 	
 	static Texture hintCursor;
 	const string HintField = "SigmarSolver:Hint";
+	static readonly HexIndex NewGameHex = new HexIndex(3, -7);
 
 	public override Type SettingsType => typeof(MySettings);
 	public static QuintessentialMod MainClassAsMod;
@@ -116,31 +117,20 @@ public class MainClass : QuintessentialMod
 		{
 			//generate a new hint from the current solitaire game
 			SolitaireState solitaireState = (SolitaireState) PrivateMethod<SolitaireScreen>("method_1889").Invoke(screen_self, new object[0]);
-			sigmarHint = solveGameState(new DynamicData(solitaireState).Get<SolitaireGameState>("field_3900"));
+			var stateData = new DynamicData(solitaireState).Get<SolitaireGameState>("field_3900");
+			sigmarHint = stateData != null ? solveGameState(stateData) : new SigmarHint(NewGameHex);
 		}
 
 		screen_dyn.Set(HintField, sigmarHint);
 
 		sigmarHint.drawHint();
 	}
+	//////////////////////////////////////////////////////////////////////////
+	// GAME STATE SOLVER
 
 	static SigmarHint solveGameState(SolitaireGameState gameState)
 	{
-
-		if (gameState.field_3864.Count() == 0) return new SigmarHint();
-		if (gameState.field_3864.Count() == 1) return new SigmarHint(gameState.field_3864.First().Key);
-		if (gameState.field_3864.Count() >= 2)
-		{
-			HexIndex a = new();
-			HexIndex b = new();
-			foreach (var kvp in gameState.field_3864)
-			{
-				a = b;
-				b = kvp.Key;
-			}
-			return new SigmarHint(a, b);
-		}
-
+		if (gameState.field_3864.Count() == 0) return new SigmarHint(NewGameHex);
 
 
 
