@@ -221,6 +221,7 @@ class SigmarSolver
 	// board data/methods
 	SigmarAtom[] original_board = new SigmarAtom[145];
 	SigmarAtom[] current_board = new SigmarAtom[145];
+	List<SigmarAtom[]>[] unsolvablePositions = new List<SigmarAtom[]>[145];
 	const byte boardFirstSpace = 12;
 	const byte boardLastSpace = 132;
 	// Each index in the array maps to the following current_board spaces:
@@ -272,7 +273,7 @@ class SigmarSolver
 	bool boardWasSolved => atomsLeftOnBoard == 0;
 	bool boardIsInvalid = false;
 
-	bool boardIsObviouslyUnsolvable()
+	bool boardIsObviouslyUnsolvable(int solverType)
 	{
 		int quints = remainingAtomsOfType[SigmarAtom.atom_quintessence];
 		int[] cardinals = new int[4] {
@@ -292,7 +293,35 @@ class SigmarSolver
 			|| remainingAtomsOfType[SigmarAtom.atom_salt] < cardinals.Select(x => (x - quints) % 2).Sum() // not enough salt
 			|| remainingAtomsOfType[SigmarAtom.atom_quicksilver] < projectables.Select(x => x % 2).Sum() // not enough quicksilver
 			|| remainingAtomsOfType[SigmarAtom.atom_quicksilver] > projectables.Sum() // too much quicksilver
+			|| (solverType == 3 && currentPositionIsBad())
 		;
+	}
+	void catalogBadMoveHistory()
+	{
+		var badBoard = new SigmarAtom[145];
+		for (int i = 12; i <= 132; i++)
+		{
+			badBoard[i] = new SigmarAtom(current_board[i].ID);
+		}
+		unsolvablePositions[atomsLeftOnBoard].Add(badBoard);
+		//if (unsolvablePositions[atomsLeftOnBoard].Count % 10 == 1) Logger.Log("Bad boards of size " + atomsLeftOnBoard + " : " + unsolvablePositions[atomsLeftOnBoard].Count);
+	}
+	bool currentPositionIsBad()
+	{
+		foreach (var badBoard in unsolvablePositions[atomsLeftOnBoard])
+		{
+			bool matches = true;
+			for (int i = 12; i <= 132; i++)
+			{
+				if (badBoard[i].ID != current_board[i].ID)
+				{
+					matches = false;
+					break;
+				}
+			}
+			if (matches) return true;
+		}
+		return false;
 	}
 
 	void printState()
@@ -337,11 +366,13 @@ class SigmarSolver
 		checkpointTime = Time.NowInSeconds();
 		original_board = new SigmarAtom[145];
 		current_board = new SigmarAtom[145];
+		unsolvablePositions = new List<SigmarAtom[]>[145];
 
 		for (int i = 0; i < current_board.Length; i++)
 		{
 			original_board[i] = new SigmarAtom();
 			current_board[i] = original_board[i];
+			unsolvablePositions[i] = new();
 		}
 
 		remainingAtomsOfType = new int[SigmarAtom.numberOfAtomIDs];
@@ -425,6 +456,8 @@ class SigmarSolver
 	Stack<Move> MoveHistory = new();
 	Stack<Move> MovesToCheck = new(); // we use Moves of size 0 to denote when to backtrack up the MoveHistory
 
+
+
 	bool OutOfMovesAtThisStage() => MovesToCheck.Peek().size == 0;
 	void MakeMove()
 	{
@@ -450,18 +483,18 @@ class SigmarSolver
 			atomsLeftOnBoard++;
 		}
 	}
-	void AddNewMove(Move M, bool alternateVersion)
+	void AddNewMove(Move M, int solverType)
 	{
-		if (alternateVersion && MovesToCheck.Any(x => Move.MovesAreEqual(x, M))) return;
+		if (solverType == 2 && MovesToCheck.Any(x => Move.MovesAreEqual(x, M))) return;
 		MovesToCheck.Push(M);
 	}
-	void generateMovesToCheck(bool alternateVersion, bool initialGeneration = false)
+	void generateMovesToCheck(int solverType, bool initialGeneration = false)
 	{
 		List<byte> freeSingletonMarbles = new();
 		List<byte> freePairableMarbles = new();
 		List<byte> freeQuintessenceMarbles = new();
 
-		if (!initialGeneration) AddNewMove(new Move(), false);
+		if (!initialGeneration) AddNewMove(new Move(), 1);
 
 		// find marbles that are free
 		// and add sington matches, too
@@ -501,7 +534,7 @@ class SigmarSolver
 							var atom1 = original_board[i1];
 							if (atomq.matches(atom1, atom2, atom3, atom4))
 							{
-								AddNewMove(new Move(q, i1, i2, i3, i4), alternateVersion);
+								AddNewMove(new Move(q, i1, i2, i3, i4), solverType);
 								Log("Added move: " + atomq.ToString() + " " + atom1.ToString() + " " + atom2.ToString() + " " + atom3.ToString() + " " + atom4.ToString());
 							}
 						}
@@ -511,6 +544,7 @@ class SigmarSolver
 		}
 
 		// add pair-moves that are valid
+		List<Move> movesToAdd = new();
 		for (int n2 = 0; n2 < freePairableMarbles.Count(); n2++)
 		{
 			byte j = freePairableMarbles[n2];
@@ -521,16 +555,59 @@ class SigmarSolver
 				var atom_i = original_board[i];
 				if (atom_i.matchesWith(atom_j))
 				{
-					AddNewMove(new Move(i, j), alternateVersion);
+					movesToAdd.Add(new Move(i, j));
 					Log("Added move: " + atom_i.ToString() + " " + atom_j.ToString());
 				}
 			}
 		}
 
+		if (solverType == 4)
+		{
+			for (int n = movesToAdd.Count - 1; n >= 0; n--)
+			{
+				AddNewMove(movesToAdd[n], solverType);
+			}
+		}
+		else if (solverType == 5)
+		{
+			List<Move> movesToAdd2 = new();
+			int i = 0, j = movesToAdd.Count;
+			bool flipflop = true;
+
+			while (i < j)
+			{
+				if (flipflop)
+				{
+					movesToAdd2.Add(movesToAdd[i]);
+					j--;
+				}
+				else
+				{
+					movesToAdd2.Add(movesToAdd[j]);
+					i++;
+				}
+				flipflop = !flipflop;
+			}
+			for (int n = movesToAdd.Count - 1; n >= 0; n--)
+			{
+				AddNewMove(movesToAdd2[n], solverType);
+			}
+		}
+		else
+		{
+			for (int n = 0; n < movesToAdd.Count; n++)
+			{
+				AddNewMove(movesToAdd[n], solverType);
+			}
+		}
+
+		
+
+
 		// add singleton moves
 		foreach (var s in freeSingletonMarbles)
 		{
-			if (original_board[s].matches()) AddNewMove(new Move(s), alternateVersion);
+			if (original_board[s].matches()) AddNewMove(new Move(s), solverType);
 		}
 	}
 
@@ -541,7 +618,7 @@ class SigmarSolver
 		//Logger.Log(msg);
 	}
 
-	public MainClass.SigmarHint solveGame(bool alternateVersion)
+	public MainClass.SigmarHint solveGame(int solverType = 1)
 	{
 		//Checkpoint("    Time spent waiting for solve signal");
 		if (boardIsInvalid)
@@ -554,13 +631,13 @@ class SigmarSolver
 			Checkpoint("The board was already solved. Time spent");
 			return MainClass.SigmarHint.NewGame;
 		}
-		if (boardIsObviouslyUnsolvable())
+		if (boardIsObviouslyUnsolvable(1))
 		{
 			Checkpoint("The board is obviously unsolvable. Time spent");
 			return MainClass.SigmarHint.NewGame;
 		}
 		//find the initial opening moves
-		generateMovesToCheck(alternateVersion, true);
+		generateMovesToCheck(1, true);
 		if (MovesToCheck.Count == 0)
 		{
 			Checkpoint("The board is already unsolvable due to no opening moves. Time spent");
@@ -582,6 +659,7 @@ class SigmarSolver
 			loops++;
 			if (OutOfMovesAtThisStage())
 			{
+				if (solverType == 3) catalogBadMoveHistory();
 				UndoMove();
 				Log("Out of moves here, moving back up a stage");
 				MovesToCheck.Pop(); // go back up a stage
@@ -595,24 +673,34 @@ class SigmarSolver
 				{
 					// reached the bottom stage!
 					var firstMove = MoveHistory.Last();
-					Checkpoint("Done - the board is solvable in " + loops + " loops" + (alternateVersion ? " using alternate code" : "") + "! Time spent");
+					string msg = "";
+					switch (solverType)
+					{
+						default: msg = "Solver" + solverType; break;
+					}
+					Checkpoint("Done - the board is solvable in " + loops + " loops using " + msg + "! Time spent");
 					return firstMove.GetHint();
 				}
-				if (boardIsObviouslyUnsolvable())
+				if (boardIsObviouslyUnsolvable(solverType))
 				{
 					Log("    Whoops, that was an obviously bad move, backtracking... ");
 					UndoMove();
 				}
 				else
 				{
-					generateMovesToCheck(alternateVersion); // go down a stage
+					generateMovesToCheck(solverType); // go down a stage
 					Log("Moving down a stage...");
 				}
+			}
+			if (loops >= new int[] { 0, 10000, 10000, 120000, 10000, 10000, 10000, 10000, 10000, 10000 }[solverType])
+			{
+				Checkpoint("Giving up after " + loops + " loops. Time spent");
+				return MainClass.SigmarHint.NewGame;
 			}
 		}
 
 		// reached all the way back up to the top stage - board cannot be solved
-		Checkpoint("Done! Board is unsolvable. Time spent");
+		Checkpoint("Done! Board is unsolvable, determined in " + loops + " loops. Time spent");
 		return MainClass.SigmarHint.NewGame;
 	}
 }

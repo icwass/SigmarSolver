@@ -30,28 +30,66 @@ public class MainClass : QuintessentialMod
 	public override Type SettingsType => typeof(MySettings);
 	public static QuintessentialMod MainClassAsMod;
 	public static bool PressedHintKey() => MySettings.Instance.hintKey.Pressed();
-	public static bool PressedHintKey2() => MySettings.Instance.hintKey2.Pressed();
+
+	public static bool playInOrder = false;
+	static long boardNum = -1;
+
+	public static bool enableSolver1 = true;
+	public static bool enableSolver2 = false;
+	public static bool enableSolver3 = false;
+	public static bool enableSolver4 = false;
+	public static bool enableSolver5 = false;
 	public class MySettings
 	{
 		//[SettingsLabel("Boolean Setting")]
 		//public bool booleanSetting = true;
 		public static MySettings Instance => MainClassAsMod.Settings as MySettings;
 
-		[SettingsLabel("Show a hint for the current solitaire.")]
+		[SettingsLabel("Play normal Sigmar's Garden games in-order")]
+		public bool playInOrder = false;
+
+		[SettingsLabel("Enable Solver1 (Default solver)")]
+		public bool enableSolver1 = true;
+
+		[SettingsLabel("Enable Solver2 (Avoids making moves that are already planned)")]
+		public bool enableSolver2 = false;
+
+		[SettingsLabel("Enable Solver3 (Keeps track of unsolvable board positions)")]
+		public bool enableSolver3 = false;
+
+		[SettingsLabel("Enable Solver4 (Generates pairs-to-check in reverse order)")]
+		public bool enableSolver4 = false;
+
+		[SettingsLabel("Enable Solver5 (Generates pairs-to-check from the middle outward)")]
+		public bool enableSolver5 = false;
+
+		[SettingsLabel("Show a hint for the current solitaire")]
 		public Keybinding hintKey = new() { Key = "D" };
-		[SettingsLabel("Show a hint for the current solitaire, alternate version.")]
-		public Keybinding hintKey2 = new() { Key = "F" };
 	}
 	public override void ApplySettings()
 	{
 		base.ApplySettings();
 		var SET = (MySettings)Settings;
-		//var booleanSetting = SET.booleanSetting;
+		if (!playInOrder) boardNum = -1;
+		playInOrder = SET.playInOrder;
+		enableSolver1 = SET.enableSolver1;
+		enableSolver2 = SET.enableSolver2;
+		enableSolver3 = SET.enableSolver3;
+		enableSolver4 = SET.enableSolver4;
+		enableSolver5 = SET.enableSolver5;
+
+		if (!enableSolver1 && !enableSolver2 && !enableSolver3 && !enableSolver4 && !enableSolver5)
+		{
+			SET.enableSolver1 = true;
+			enableSolver1 = true;
+			base.ApplySettings();
+		}
 	}
 	public override void Load()
 	{
 		MainClassAsMod = this;
 		Settings = new MySettings();
+		IL.class_198.method_537 += DecidePlayOrder;
 	}
 	public override void LoadPuzzleContent()
 	{
@@ -64,6 +102,32 @@ public class MainClass : QuintessentialMod
 	public override void PostLoad()
 	{
 		On.SolitaireScreen.method_50 += SolitaireScreen_Method_50;
+	}
+	private static void DecidePlayOrder(ILContext il)
+	{
+		ILCursor cursor = new ILCursor(il);
+		// skip ahead to roughly where the "seek to board data" code occurs
+		cursor.Goto(18);
+
+		// jump ahead to just after the multiplication and conversion to int64
+		if (!cursor.TryGotoNext(MoveType.After, instr => instr.Match(OpCodes.Conv_I8))) return;
+
+		// load the number of boards onto the stack
+		cursor.Emit(OpCodes.Ldloc_1);
+
+		// then run the new code
+		cursor.EmitDelegate((long seek, int totalBoards) =>
+		{
+			if (playInOrder)
+			{
+				boardNum = (boardNum + 1) % totalBoards;
+				return boardNum * 3 * 55;
+			}
+			else
+			{
+				return seek;
+			}
+		});
 	}
 
 	public class SigmarHint
@@ -125,27 +189,52 @@ public class MainClass : QuintessentialMod
 
 		bool allowedToStartNewGame = (bool) PrivateMethod<SolitaireScreen>("method_1894").Invoke(screen_self, new object[0]);
 
-		if ((PressedHintKey() || PressedHintKey2()) && allowedToStartNewGame)
+		if ((PressedHintKey()) && allowedToStartNewGame)
 		{
 			//generate a new hint from the current solitaire game
 			SolitaireState solitaireState = (SolitaireState) PrivateMethod<SolitaireScreen>("method_1889").Invoke(screen_self, new object[0]);
 			var stateData = new DynamicData(solitaireState).Get<SolitaireGameState>("field_3900");
-			sigmarHint = stateData != null ? getHint(stateData, false) : SigmarHint.NewGame;
-			if (PressedHintKey2()) sigmarHint = stateData != null ? getHint(stateData, true) : SigmarHint.NewGame;
-			if (PressedHintKey2()) Logger.Log("");
-			class_238.field_1991.field_1843.method_28(1f); // duplication sound
+			var boardDictionary = stateData == null ? new() : stateData.field_3864 ?? new();
+
+			if (playInOrder) Logger.Log("Board Number: " + boardNum);
+
+			if (boardDictionary.Count() == 0)
+			{
+				sigmarHint = SigmarHint.NewGame;
+				class_238.field_1991.field_1863.method_28(1f); // sim_stop sound
+			}
+			else
+			{
+				if (enableSolver1)
+				{
+					sigmarHint = new SigmarSolver(boardDictionary).solveGame(1);
+					class_238.field_1991.field_1839.method_28(1f); // glyph_bonding sound
+				}
+				if (enableSolver2)
+				{
+					sigmarHint = new SigmarSolver(boardDictionary).solveGame(2);
+					class_238.field_1991.field_1847.method_28(1f); // glyph_triplex2 sound
+				}
+				if (enableSolver3)
+				{
+					sigmarHint = new SigmarSolver(boardDictionary).solveGame(3);
+					class_238.field_1991.field_1848.method_28(1f); // glyph_triplex3 sound
+				}
+				if (enableSolver4)
+				{
+					sigmarHint = new SigmarSolver(boardDictionary).solveGame(4);
+					class_238.field_1991.field_1849.method_28(1f); // glyph_unbonding sound
+				}
+				if (enableSolver5)
+				{
+					sigmarHint = new SigmarSolver(boardDictionary).solveGame(5);
+					class_238.field_1991.field_1846.method_28(1f); // glyph_triplex1 sound
+				}
+				Logger.Log("");
+			}
 		}
 
 		screen_dyn.Set(HintField, sigmarHint);
-
 		sigmarHint.drawHint();
-	}
-
-	static SigmarHint getHint(SolitaireGameState solitaireGameState, bool alternateVersion)
-	{
-		var boardDictionary = solitaireGameState.field_3864;
-		if (boardDictionary.Count() == 0) return SigmarHint.Exit;
-		var hint = new SigmarSolver(boardDictionary).solveGame(alternateVersion);
-		return hint;
 	}
 }
