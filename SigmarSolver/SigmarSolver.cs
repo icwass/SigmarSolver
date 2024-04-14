@@ -30,6 +30,7 @@ public class MainClass : QuintessentialMod
 	public override Type SettingsType => typeof(MySettings);
 	public static QuintessentialMod MainClassAsMod;
 	public static bool PressedHintKey() => MySettings.Instance.hintKey.Pressed();
+	public static bool PressedHintKey2() => MySettings.Instance.hintKey2.Pressed();
 	public class MySettings
 	{
 		//[SettingsLabel("Boolean Setting")]
@@ -38,6 +39,8 @@ public class MainClass : QuintessentialMod
 
 		[SettingsLabel("Show a hint for the current solitaire.")]
 		public Keybinding hintKey = new() { Key = "D" };
+		[SettingsLabel("Show a hint for the current solitaire, alternate version.")]
+		public Keybinding hintKey2 = new() { Key = "F" };
 	}
 	public override void ApplySettings()
 	{
@@ -122,12 +125,13 @@ public class MainClass : QuintessentialMod
 
 		bool allowedToStartNewGame = (bool) PrivateMethod<SolitaireScreen>("method_1894").Invoke(screen_self, new object[0]);
 
-		if (PressedHintKey() && allowedToStartNewGame)
+		if ((PressedHintKey() || PressedHintKey2()) && allowedToStartNewGame)
 		{
 			//generate a new hint from the current solitaire game
 			SolitaireState solitaireState = (SolitaireState) PrivateMethod<SolitaireScreen>("method_1889").Invoke(screen_self, new object[0]);
 			var stateData = new DynamicData(solitaireState).Get<SolitaireGameState>("field_3900");
-			sigmarHint = stateData != null ? getHint(stateData) : SigmarHint.NewGame;
+			sigmarHint = stateData != null ? getHint(stateData, PressedHintKey2()) : SigmarHint.NewGame;
+
 		}
 
 		screen_dyn.Set(HintField, sigmarHint);
@@ -135,11 +139,11 @@ public class MainClass : QuintessentialMod
 		sigmarHint.drawHint();
 	}
 
-	static SigmarHint getHint(SolitaireGameState solitaireGameState)
+	static SigmarHint getHint(SolitaireGameState solitaireGameState, bool alternateVersion)
 	{
 		var boardDictionary = solitaireGameState.field_3864;
 		if (boardDictionary.Count() == 0) return SigmarHint.Exit;
-		var hint = new SigmarSolver(boardDictionary).solveGame();
+		var hint = new SigmarSolver(boardDictionary).solveGame(alternateVersion);
 		class_238.field_1991.field_1843.method_28(1f); // duplication sound
 		return hint;
 	}
