@@ -566,17 +566,20 @@ class SigmarSolver
 			Checkpoint("The board is already unsolvable due to no opening moves. Time spent");
 			return MainClass.SigmarHint.NewGame;
 		}
+		/*
 		if (MovesToCheck.Count == 1)
 		{
 			Checkpoint("The board has only one valid move. Time spent");
 			return MovesToCheck.Peek().GetHint();
 		}
+		*/
 
 
 		//Checkpoint("    Ready for solving" + (alternateVersion ? " using alternate code" : ""));
-
+		int loops = 0;
 		while (MovesToCheck.Count > 0)
 		{
+			loops++;
 			if (OutOfMovesAtThisStage())
 			{
 				UndoMove();
@@ -592,7 +595,7 @@ class SigmarSolver
 				{
 					// reached the bottom stage!
 					var firstMove = MoveHistory.Last();
-					Checkpoint("Done - the board is solvable" + (alternateVersion ? " using alternate code" : "") + "! Time spent");
+					Checkpoint("Done - the board is solvable in " + loops + " loops" + (alternateVersion ? " using alternate code" : "") + "! Time spent");
 					return firstMove.GetHint();
 				}
 				if (boardIsObviouslyUnsolvable())

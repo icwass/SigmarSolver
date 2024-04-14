@@ -130,8 +130,10 @@ public class MainClass : QuintessentialMod
 			//generate a new hint from the current solitaire game
 			SolitaireState solitaireState = (SolitaireState) PrivateMethod<SolitaireScreen>("method_1889").Invoke(screen_self, new object[0]);
 			var stateData = new DynamicData(solitaireState).Get<SolitaireGameState>("field_3900");
-			sigmarHint = stateData != null ? getHint(stateData, PressedHintKey2()) : SigmarHint.NewGame;
-
+			sigmarHint = stateData != null ? getHint(stateData, false) : SigmarHint.NewGame;
+			if (PressedHintKey2()) sigmarHint = stateData != null ? getHint(stateData, true) : SigmarHint.NewGame;
+			if (PressedHintKey2()) Logger.Log("");
+			class_238.field_1991.field_1843.method_28(1f); // duplication sound
 		}
 
 		screen_dyn.Set(HintField, sigmarHint);
@@ -144,7 +146,6 @@ public class MainClass : QuintessentialMod
 		var boardDictionary = solitaireGameState.field_3864;
 		if (boardDictionary.Count() == 0) return SigmarHint.Exit;
 		var hint = new SigmarSolver(boardDictionary).solveGame(alternateVersion);
-		class_238.field_1991.field_1843.method_28(1f); // duplication sound
 		return hint;
 	}
 }
