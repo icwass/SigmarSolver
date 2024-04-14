@@ -26,7 +26,6 @@ public class MainClass : QuintessentialMod
 	
 	static Texture hintCursor;
 	const string HintField = "SigmarSolver:Hint";
-	static readonly HexIndex NewGameHex = new HexIndex(3, -7);
 
 	public override Type SettingsType => typeof(MySettings);
 	public static QuintessentialMod MainClassAsMod;
@@ -64,34 +63,34 @@ public class MainClass : QuintessentialMod
 		On.SolitaireScreen.method_50 += SolitaireScreen_Method_50;
 	}
 
-	struct SigmarHint
+	public class SigmarHint
 	{
-		public int count = 0;
-		public HexIndex[] hints = new HexIndex[2]{ new(), new() };
+		static readonly HexIndex NewGameHex = new HexIndex(3, -7);
+		static readonly HexIndex ExitHex = new HexIndex(9, 6);
+		HexIndex[] hints = new HexIndex[0];
 
-		public SigmarHint()
-		{
-			this.count = 0;
-		}
-		public SigmarHint(HexIndex hint1)
-		{
-			this.count = 1;
-			hints[0] = hint1;
-		}
-		public SigmarHint(HexIndex hint1, HexIndex hint2)
-		{
-			this.count = 2;
-			hints[0] = hint1;
-			hints[1] = hint2;
-		}
+		public static SigmarHint NewGame => new SigmarHint(NewGameHex);
+		public static SigmarHint Exit => new SigmarHint(ExitHex);
+		public SigmarHint()	{ }
+		public SigmarHint(HexIndex hint) { this.hints = new HexIndex[1] { hint }; }
+		public SigmarHint(HexIndex hint1, HexIndex hint2) { this.hints = new HexIndex[2] { hint1, hint2 }; }
+		public SigmarHint(HexIndex[] hints) { this.hints = hints; }
 
 		public void drawHint()
 		{
-			Vector2 offset(HexIndex hex) => class_187.field_1743.method_491(hex, new Vector2(687f, 506f) + class_115.field_1433 / 2 - new Vector2(1516f, 922f) / 2) + new Vector2(-2f, -11f);
-
-			for (int i = 0; i < this.count; i++)
+			for (int i = 0; i < this.hints.Count(); i++)
 			{
-				class_135.method_272(hintCursor, offset(this.hints[i]) - hintCursor.field_2056.ToVector2() / 2);
+				var hex = this.hints[i];
+				var offset = class_187.field_1743.method_491(hex, new Vector2(687f, 506f) + class_115.field_1433 / 2 - new Vector2(1516f, 922f) / 2) + new Vector2(-2f, -11f);
+				if (hex == ExitHex)
+				{
+					offset -= new Vector2(53, 9);
+				}
+				else if (hex == NewGameHex)
+				{
+					offset += new Vector2(11, 11);
+				}
+				class_135.method_272(hintCursor, offset - hintCursor.field_2056.ToVector2() / 2);
 			}
 		}
 	}
@@ -115,30 +114,21 @@ public class MainClass : QuintessentialMod
 
 		if (PressedHintKey() && allowedToStartNewGame)
 		{
-			//generate a new hint from the current solitaire game
+			//generate x1 new hint from the current solitaire game
 			SolitaireState solitaireState = (SolitaireState) PrivateMethod<SolitaireScreen>("method_1889").Invoke(screen_self, new object[0]);
 			var stateData = new DynamicData(solitaireState).Get<SolitaireGameState>("field_3900");
-			sigmarHint = stateData != null ? solveGameState(stateData) : new SigmarHint(NewGameHex);
+			sigmarHint = stateData != null ? getHint(stateData) : SigmarHint.NewGame;
 		}
 
 		screen_dyn.Set(HintField, sigmarHint);
 
 		sigmarHint.drawHint();
 	}
-	//////////////////////////////////////////////////////////////////////////
-	// GAME STATE SOLVER
 
-	static SigmarHint solveGameState(SolitaireGameState gameState)
+	static SigmarHint getHint(SolitaireGameState solitaireGameState)
 	{
-		if (gameState.field_3864.Count() == 0) return new SigmarHint(NewGameHex);
-
-
-
-
-
-
-
-
-		return new SigmarHint();
+		var boardDictionary = solitaireGameState.field_3864;
+		if (boardDictionary.Count() == 0) return SigmarHint.Exit;
+		return new SigmarSolver(boardDictionary).solveGame();
 	}
 }
