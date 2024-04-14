@@ -222,6 +222,7 @@ class SigmarSolver
 	SigmarAtom[] original_board = new SigmarAtom[145];
 	SigmarAtom[] current_board = new SigmarAtom[145];
 	List<SigmarAtom[]>[] unsolvablePositions = new List<SigmarAtom[]>[145];
+	List<HashSet<Move>>[] unsolvableHistories = new List<HashSet<Move>>[121];
 	const byte boardFirstSpace = 12;
 	const byte boardLastSpace = 132;
 	// Each index in the array maps to the following current_board spaces:
@@ -294,9 +295,10 @@ class SigmarSolver
 			|| remainingAtomsOfType[SigmarAtom.atom_quicksilver] < projectables.Select(x => x % 2).Sum() // not enough quicksilver
 			|| remainingAtomsOfType[SigmarAtom.atom_quicksilver] > projectables.Sum() // too much quicksilver
 			|| (solverType == 3 && currentPositionIsBad())
+			|| (solverType == 6 && currentMoveHistoryIsBad())
 		;
 	}
-	void catalogBadMoveHistory()
+	void catalogBadBoard()
 	{
 		var badBoard = new SigmarAtom[145];
 		for (int i = 12; i <= 132; i++)
@@ -320,6 +322,42 @@ class SigmarSolver
 				}
 			}
 			if (matches) return true;
+		}
+		return false;
+	}
+	void catalogBadMoveHistory()
+	{
+		var set = new HashSet<Move>();
+		foreach (var move in MoveHistory)
+		{
+			set.Add(move);
+		}
+		unsolvableHistories[MoveHistory.Count].Add(set);
+		//if (unsolvableHistories[MoveHistory.Count].Count % 10 == 1) Logger.Log("Bad histories of size " + MoveHistory.Count + " : " + unsolvableHistories[MoveHistory.Count].Count);
+	}
+	bool currentMoveHistoryIsBad()
+	{
+		foreach (var badHistory in unsolvableHistories[MoveHistory.Count])
+		{
+			bool foundMatch = true;
+			foreach (var move in MoveHistory)
+			{
+				bool matches = false;
+				foreach (var badmove in badHistory)
+				{
+					if (Move.MovesAreEqual(badmove, move))
+					{
+						matches = true;
+						break;
+					}
+				}
+				if (!matches)
+				{
+					foundMatch = false;
+					break;
+				}
+			}
+			if (foundMatch) return true;
 		}
 		return false;
 	}
@@ -355,7 +393,7 @@ class SigmarSolver
 	float checkpointTime;
 	void Checkpoint(string msg = "")
 	{
-		if (msg != "") Logger.Log("[SigmarSolver]" + msg + ": " + (Time.NowInSeconds() - checkpointTime));
+		if (msg != "" && MainClass.enableDataLogging) Logger.Log("[SigmarSolver]" + msg + ": " + (Time.NowInSeconds() - checkpointTime));
 		checkpointTime = Time.NowInSeconds();
 	}
 
@@ -367,12 +405,17 @@ class SigmarSolver
 		original_board = new SigmarAtom[145];
 		current_board = new SigmarAtom[145];
 		unsolvablePositions = new List<SigmarAtom[]>[145];
+		unsolvableHistories = new List<HashSet<Move>>[121];
 
 		for (int i = 0; i < current_board.Length; i++)
 		{
 			original_board[i] = new SigmarAtom();
 			current_board[i] = original_board[i];
 			unsolvablePositions[i] = new();
+		}
+		for (int i = 0; i < unsolvableHistories.Length; i++)
+		{
+			unsolvableHistories[i] = new();
 		}
 
 		remainingAtomsOfType = new int[SigmarAtom.numberOfAtomIDs];
@@ -659,7 +702,8 @@ class SigmarSolver
 			loops++;
 			if (OutOfMovesAtThisStage())
 			{
-				if (solverType == 3) catalogBadMoveHistory();
+				if (solverType == 3) catalogBadBoard();
+				if (solverType == 6) catalogBadMoveHistory();
 				UndoMove();
 				Log("Out of moves here, moving back up a stage");
 				MovesToCheck.Pop(); // go back up a stage
@@ -676,6 +720,7 @@ class SigmarSolver
 					string msg = "";
 					switch (solverType)
 					{
+						case 0: msg = "Solver1 (timeout disabled)"; break;
 						default: msg = "Solver" + solverType; break;
 					}
 					Checkpoint("Done - the board is solvable in " + loops + " loops using " + msg + "! Time spent");
@@ -692,10 +737,10 @@ class SigmarSolver
 					Log("Moving down a stage...");
 				}
 			}
-			if (loops >= new int[] { 0, 10000, 10000, 120000, 10000, 10000, 10000, 10000, 10000, 10000 }[solverType])
+			if (loops >= new int[] { int.MaxValue, 20000, 20000, 200000, 20000, 20000, 2000 }[solverType])
 			{
 				Checkpoint("Giving up after " + loops + " loops. Time spent");
-				return MainClass.SigmarHint.NewGame;
+				return MainClass.SigmarHint.TimeOut;
 			}
 		}
 

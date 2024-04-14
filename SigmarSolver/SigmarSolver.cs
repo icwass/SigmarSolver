@@ -39,6 +39,9 @@ public class MainClass : QuintessentialMod
 	public static bool enableSolver3 = false;
 	public static bool enableSolver4 = false;
 	public static bool enableSolver5 = false;
+	public static bool enableSolver6 = false;
+
+	public static bool enableDataLogging = false;
 	public class MySettings
 	{
 		//[SettingsLabel("Boolean Setting")]
@@ -48,13 +51,16 @@ public class MainClass : QuintessentialMod
 		[SettingsLabel("Play normal Sigmar's Garden games in-order")]
 		public bool playInOrder = false;
 
+		[SettingsLabel("Enable data logging in log.txt")]
+		public bool enableDataLogging = false;
+
 		[SettingsLabel("Enable Solver1 (Default solver)")]
 		public bool enableSolver1 = true;
 
 		[SettingsLabel("Enable Solver2 (Avoids making moves that are already planned)")]
 		public bool enableSolver2 = false;
 
-		[SettingsLabel("Enable Solver3 (Keeps track of unsolvable board positions)")]
+		[SettingsLabel("Enable Solver3 (Keeps track of unsolvable board-positions)")]
 		public bool enableSolver3 = false;
 
 		[SettingsLabel("Enable Solver4 (Generates pairs-to-check in reverse order)")]
@@ -62,6 +68,9 @@ public class MainClass : QuintessentialMod
 
 		[SettingsLabel("Enable Solver5 (Generates pairs-to-check from the middle outward)")]
 		public bool enableSolver5 = false;
+
+		[SettingsLabel("Enable Solver6 (Keeps track of unsolvable move-histories)")]
+		public bool enableSolver6 = false;
 
 		[SettingsLabel("Show a hint for the current solitaire")]
 		public Keybinding hintKey = new() { Key = "D" };
@@ -72,13 +81,15 @@ public class MainClass : QuintessentialMod
 		var SET = (MySettings)Settings;
 		if (!playInOrder) boardNum = -1;
 		playInOrder = SET.playInOrder;
+		enableDataLogging = SET.enableDataLogging;
 		enableSolver1 = SET.enableSolver1;
 		enableSolver2 = SET.enableSolver2;
 		enableSolver3 = SET.enableSolver3;
 		enableSolver4 = SET.enableSolver4;
 		enableSolver5 = SET.enableSolver5;
+		enableSolver6 = SET.enableSolver6;
 
-		if (!enableSolver1 && !enableSolver2 && !enableSolver3 && !enableSolver4 && !enableSolver5)
+		if (!enableSolver1 && !enableSolver2 && !enableSolver3 && !enableSolver4 && !enableSolver5 && !enableSolver6)
 		{
 			SET.enableSolver1 = true;
 			enableSolver1 = true;
@@ -136,8 +147,11 @@ public class MainClass : QuintessentialMod
 		static readonly HexIndex ExitHex = new HexIndex(9, 6);
 		HexIndex[] hints = new HexIndex[0];
 
+		public bool isEmpty => hints.Length == 0;
+
 		public static SigmarHint NewGame => new SigmarHint(NewGameHex);
 		public static SigmarHint Exit => new SigmarHint(ExitHex);
+		public static SigmarHint TimeOut => new SigmarHint();
 		public SigmarHint()	{ }
 		public SigmarHint(HexIndex hint) { this.hints = new HexIndex[1] { hint }; }
 		public SigmarHint(HexIndex hint1, HexIndex hint2) { this.hints = new HexIndex[2] { hint1, hint2 }; }
@@ -196,7 +210,8 @@ public class MainClass : QuintessentialMod
 			var stateData = new DynamicData(solitaireState).Get<SolitaireGameState>("field_3900");
 			var boardDictionary = stateData == null ? new() : stateData.field_3864 ?? new();
 
-			if (playInOrder) Logger.Log("Board Number: " + boardNum);
+			if (enableDataLogging) Logger.Log("");
+			if (playInOrder && enableDataLogging) Logger.Log("Board Number: " + (boardNum+1));
 
 			if (boardDictionary.Count() == 0)
 			{
@@ -205,32 +220,50 @@ public class MainClass : QuintessentialMod
 			}
 			else
 			{
+				var tempHint = SigmarHint.TimeOut;
 				if (enableSolver1)
 				{
-					sigmarHint = new SigmarSolver(boardDictionary).solveGame(1);
-					class_238.field_1991.field_1839.method_28(1f); // glyph_bonding sound
+					tempHint = new SigmarSolver(boardDictionary).solveGame(1);
+					if (!tempHint.isEmpty) sigmarHint = tempHint;
+					class_238.field_1991.field_1846.method_28(1f); // glyph_triplex1 sound
 				}
 				if (enableSolver2)
 				{
-					sigmarHint = new SigmarSolver(boardDictionary).solveGame(2);
-					class_238.field_1991.field_1847.method_28(1f); // glyph_triplex2 sound
+					tempHint = new SigmarSolver(boardDictionary).solveGame(2);
+					if (!tempHint.isEmpty) sigmarHint = tempHint;
+					class_238.field_1991.field_1843.method_28(1f); // glyph_duplication sound
 				}
 				if (enableSolver3)
 				{
-					sigmarHint = new SigmarSolver(boardDictionary).solveGame(3);
-					class_238.field_1991.field_1848.method_28(1f); // glyph_triplex3 sound
+					tempHint = new SigmarSolver(boardDictionary).solveGame(3);
+					if (!tempHint.isEmpty) sigmarHint = tempHint;
+					class_238.field_1991.field_1844.method_28(1f); // glyph_projection sound
 				}
 				if (enableSolver4)
 				{
-					sigmarHint = new SigmarSolver(boardDictionary).solveGame(4);
-					class_238.field_1991.field_1849.method_28(1f); // glyph_unbonding sound
+					tempHint = new SigmarSolver(boardDictionary).solveGame(4);
+					if (!tempHint.isEmpty) sigmarHint = tempHint;
+					class_238.field_1991.field_1847.method_28(1f); // glyph_triplex2 sound
 				}
 				if (enableSolver5)
 				{
-					sigmarHint = new SigmarSolver(boardDictionary).solveGame(5);
-					class_238.field_1991.field_1846.method_28(1f); // glyph_triplex1 sound
+					tempHint = new SigmarSolver(boardDictionary).solveGame(5);
+					if (!tempHint.isEmpty) sigmarHint = tempHint;
+					class_238.field_1991.field_1848.method_28(1f); // glyph_triplex3 sound
 				}
-				Logger.Log("");
+				if (enableSolver6)
+				{
+					tempHint = new SigmarSolver(boardDictionary).solveGame(6);
+					if (!tempHint.isEmpty) sigmarHint = tempHint;
+					class_238.field_1991.field_1845.method_28(1f); // glyph_purification sound
+				}
+				if (sigmarHint.isEmpty)
+				{
+					class_238.field_1991.field_1860.method_28(1f); // sim_error sound
+					sigmarHint = new SigmarSolver(boardDictionary).solveGame(0);
+					class_238.field_1991.field_1863.method_28(1f); // sim_stop sound
+				}
+				if (enableDataLogging) Logger.Log("");
 			}
 		}
 
