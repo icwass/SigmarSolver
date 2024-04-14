@@ -97,6 +97,7 @@ struct SigmarAtom
 	const byte match__unification = 0b_0000_1000;
 
 	const byte mask____pair_flags = match___projection | match__duplication | match____animismus;
+	const byte mask___quint_flags = match__unification;
 
 	const byte match_____________ = match_________none;
 	const byte match________berlo = match_________self | match__duplication;
@@ -113,7 +114,7 @@ struct SigmarAtom
 	const byte matchID_________fire = 0b_00_0100;
 	const byte matchID________earth = 0b_00_1000;
 	const byte matchID_quintessence = 0b_10_0000;
-	const byte match____unification = matchID_quintessence | matchID__________air | matchID________water | matchID_________fire | matchID________earth;
+	const byte match___quintessence = matchID_quintessence | matchID__________air | matchID________water | matchID_________fire | matchID________earth;
 
 	// note: define atoms so the following statement is always true: (X matches with Y) => (X.matchType & Y.matchType != 0)
 	static Dictionary<byte, SigmarAtom> atomGenerator = new()
@@ -180,7 +181,18 @@ struct SigmarAtom
 	//////////////////////////////////////////////////////////////
 	// values above are chosen so the following functions are fast
 	public bool matches() => (this.matchType & match____singleton) == match____singleton;
-	public bool matches(SigmarAtom a, SigmarAtom b, SigmarAtom c, SigmarAtom d) => (this.matchID | a.matchID | b.matchID | c.matchID | d.matchID) == match____unification; // assumes this.isQuintessence == true
+	public bool matches(SigmarAtom a, SigmarAtom b, SigmarAtom c, SigmarAtom d)
+	{
+		var matchFlagAND = this.matchType & a.matchType & b.matchType & c.matchType & d.matchType;
+		// we now check for what kind of flags we have
+		// only check flags that are relevant for quintets of atoms
+		switch (matchFlagAND & mask___quint_flags)
+		{
+			case match__unification: return (this.matchID | a.matchID | b.matchID | c.matchID | d.matchID) == match___quintessence;
+			// any other case is not a valid match
+			default: return false;
+		}
+	}
 	public bool matchesWith(SigmarAtom x)
 	{
 		// cannot make a pair if one of the atoms cannot pair
@@ -311,18 +323,18 @@ class SigmarSolver
 		}
 	}
 
-	Time checkpointTime;
+	float checkpointTime;
 	void Checkpoint(string msg = "")
 	{
-		if (msg != "") Logger.Log("[SigmarSolver]" + msg + ": " + (Time.Now() - checkpointTime));
-		checkpointTime = Time.Now();
+		if (msg != "") Logger.Log("[SigmarSolver]" + msg + ": " + (Time.NowInSeconds() - checkpointTime));
+		checkpointTime = Time.NowInSeconds();
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	// constructor
 	public SigmarSolver(Dictionary<HexIndex, AtomType> boardDictionary)
 	{
-		checkpointTime = Time.Now();
+		checkpointTime = Time.NowInSeconds();
 		original_board = new SigmarAtom[145];
 		current_board = new SigmarAtom[145];
 
@@ -441,6 +453,7 @@ class SigmarSolver
 	}
 	void generateMovesToCheck(bool initialGeneration = false)
 	{
+		List<byte> freeSingletonMarbles = new();
 		List<byte> freePairableMarbles = new();
 		List<byte> freeQuintessenceMarbles = new();
 
@@ -456,11 +469,7 @@ class SigmarSolver
 				switch (original_board[i].atomsNeededForMatch())
 				{
 					case 2: freePairableMarbles.Add(i); break;
-					case 1: if (original_board[i].matches())
-						{
-							MovesToCheck.Push(new Move(i));
-						}
-						break;
+					case 1: freeSingletonMarbles.Add(i); break;
 					default: freeQuintessenceMarbles.Add(i); break;
 				}
 			}
@@ -469,6 +478,7 @@ class SigmarSolver
 		// add quintessence-moves that are valid
 		foreach (byte q in freeQuintessenceMarbles)
 		{
+			var atomq = original_board[q];
 			for (int n4 = 0; n4 < freePairableMarbles.Count(); n4++)
 			{
 				byte i4 = freePairableMarbles[n4];
@@ -485,9 +495,10 @@ class SigmarSolver
 						{
 							byte i1 = freePairableMarbles[n1];
 							var atom1 = original_board[i1];
-							if (original_board[q].matches(original_board[i1], atom2, atom3, atom4))
+							if (atomq.matches(atom1, atom2, atom3, atom4))
 							{
 								MovesToCheck.Push(new Move(q, i1, i2, i3, i4));
+								Logger.Log("Added move: " + atomq.ToString() + " " + atom1.ToString() + " " + atom2.ToString() + " " + atom3.ToString() + " " + atom4.ToString());
 							}
 						}
 					}
@@ -503,12 +514,19 @@ class SigmarSolver
 			for (int n1 = n2 + 1; n1 < freePairableMarbles.Count(); n1++)
 			{
 				byte i = freePairableMarbles[n1];
-				var atom_i = original_board[j];
+				var atom_i = original_board[i];
 				if (atom_i.matchesWith(atom_j))
 				{
 					MovesToCheck.Push(new Move(i, j));
+					Logger.Log("Added move: " + atom_i.ToString() + " " + atom_j.ToString());
 				}
 			}
+		}
+
+		// add singleton moves
+		foreach (var s in freeSingletonMarbles)
+		{
+			if (original_board[s].matches()) MovesToCheck.Push(new Move(s));
 		}
 	}
 
@@ -539,6 +557,11 @@ class SigmarSolver
 			Checkpoint("The board is already unsolvable due to no opening moves. Time spent");
 			return MainClass.SigmarHint.NewGame;
 		}
+		if (MovesToCheck.Count == 1)
+		{
+			Checkpoint("The board has only one valid move. Time spent");
+			return MovesToCheck.Peek().GetHint();
+		}
 
 
 		Checkpoint("    Ready for solving");
@@ -548,11 +571,14 @@ class SigmarSolver
 			if (OutOfMovesAtThisStage())
 			{
 				UndoMove();
+				Logger.Log("Out of moves here, moving back up a stage");
 				MovesToCheck.Pop(); // go back up a stage
 			}
 			else
 			{
 				MakeMove();
+				var M = MoveHistory.Peek();
+				Logger.Log("    Let's try " + M.GetHint().ToString());
 				if (boardWasSolved)
 				{
 					// reached the bottom stage!
@@ -562,11 +588,13 @@ class SigmarSolver
 				}
 				if (boardIsObviouslyUnsolvable())
 				{
+					Logger.Log("    Whoops, that was an obviously bad move, backtracking... ");
 					UndoMove();
 				}
 				else
 				{
 					generateMovesToCheck(); // go down a stage
+					Logger.Log("Moving down a stage...");
 				}
 			}
 		}

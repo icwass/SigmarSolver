@@ -76,6 +76,16 @@ public class MainClass : QuintessentialMod
 		public SigmarHint(HexIndex hint1, HexIndex hint2) { this.hints = new HexIndex[2] { hint1, hint2 }; }
 		public SigmarHint(HexIndex[] hints) { this.hints = hints; }
 
+		override public string ToString()
+		{
+			string str = "(";
+			foreach (var hint in this.hints)
+			{
+				str += " " + hint.Q + ", " + hint.R + ";";
+			}
+			return str + ")";
+		}
+
 		public void drawHint()
 		{
 			for (int i = 0; i < this.hints.Count(); i++)
