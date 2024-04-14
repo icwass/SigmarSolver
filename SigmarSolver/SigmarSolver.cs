@@ -129,6 +129,8 @@ public class MainClass : QuintessentialMod
 	{
 		var boardDictionary = solitaireGameState.field_3864;
 		if (boardDictionary.Count() == 0) return SigmarHint.Exit;
-		return new SigmarSolver(boardDictionary).solveGame();
+		var hint = new SigmarSolver(boardDictionary).solveGame();
+		class_238.field_1991.field_1843.method_28(1f); // duplication sound
+		return hint;
 	}
 }
