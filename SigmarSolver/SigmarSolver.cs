@@ -114,7 +114,7 @@ public class MainClass : QuintessentialMod
 
 		if (PressedHintKey() && allowedToStartNewGame)
 		{
-			//generate x1 new hint from the current solitaire game
+			//generate a new hint from the current solitaire game
 			SolitaireState solitaireState = (SolitaireState) PrivateMethod<SolitaireScreen>("method_1889").Invoke(screen_self, new object[0]);
 			var stateData = new DynamicData(solitaireState).Get<SolitaireGameState>("field_3900");
 			sigmarHint = stateData != null ? getHint(stateData) : SigmarHint.NewGame;

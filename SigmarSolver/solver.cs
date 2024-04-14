@@ -65,24 +65,24 @@ struct SigmarAtom
 	}
 
 	// IDs
-	const byte         atom_null = 0;
-	const byte         atom_salt = 1;
-	const byte          atom_air = 2;
-	const byte        atom_earth = 3;
-	const byte         atom_fire = 4;
-	const byte        atom_water = 5;
-	const byte  atom_quicksilver = 6;
-	const byte         atom_gold = 7;
-	const byte       atom_silver = 8;
-	const byte       atom_copper = 9;
-	const byte         atom_iron = 10;
-	const byte          atom_tin = 11;
-	const byte         atom_lead = 12;
-	const byte        atom_vitae = 13;
-	const byte         atom_mors = 14;
-	const byte       atom_repeat = 15; // reserved but not used
-	const byte atom_quintessence = 16;
-	const byte       minUnusedID = 17;
+	public const byte         atom_null = 0;
+	public const byte         atom_salt = 1;
+	public const byte          atom_air = 2;
+	public const byte        atom_earth = 3;
+	public const byte         atom_fire = 4;
+	public const byte        atom_water = 5;
+	public const byte  atom_quicksilver = 6;
+	public const byte         atom_gold = 7;
+	public const byte       atom_silver = 8;
+	public const byte       atom_copper = 9;
+	public const byte         atom_iron = 10;
+	public const byte          atom_tin = 11;
+	public const byte         atom_lead = 12;
+	public const byte        atom_vitae = 13;
+	public const byte         atom_mors = 14;
+	public const byte       atom_repeat = 15; // reserved but not used
+	public const byte atom_quintessence = 16;
+	public const byte       minUnusedID = 17;
 
 	// matchTypes
 	const byte match_________none = 0b_0000_0000;
@@ -156,6 +156,26 @@ struct SigmarAtom
 		{class_175.field_1689,       atom_repeat},
 		// any other atomType is not allowed
 	};
+	public static Dictionary<byte, byte> blockID = new()
+	{
+		{        atom_null, atom_null},
+		{ atom_quicksilver, atom_null},
+		{        atom_lead, atom_null},
+		{         atom_tin, atom_lead},
+		{        atom_iron, atom_tin},
+		{      atom_copper, atom_iron},
+		{      atom_silver, atom_copper},
+		{        atom_gold, atom_silver},
+		{        atom_salt, atom_null},
+		{         atom_air, atom_null},
+		{       atom_water, atom_null},
+		{        atom_fire, atom_null},
+		{       atom_earth, atom_null},
+		{atom_quintessence, atom_null},
+		{       atom_vitae, atom_null},
+		{        atom_mors, atom_null},
+		{      atom_repeat, atom_null}
+	};
 
 	//////////////////////////////////////////////////////////////
 	// values above are chosen so the following functions are fast
@@ -163,10 +183,10 @@ struct SigmarAtom
 	public bool matches(SigmarAtom a, SigmarAtom b, SigmarAtom c, SigmarAtom d) => (this.matchID | a.matchID | b.matchID | c.matchID | d.matchID) == match____unification; // assumes this.isQuintessence == true
 	public bool matches(SigmarAtom x)
 	{
-		// cannot make x1 pair if one of the atoms cannot pair
+		// cannot make a pair if one of the atoms cannot pair
 		var matchFlagOR = this.matchType | x.matchType;
 		if ((matchFlagOR & match__cannot_pair) == match__cannot_pair) return false;
-		// if the types are identical, then return whether x1 self-match is acceptable
+		// if the types are identical, then return whether a self-match is acceptable
 		var matchFlagAND = this.matchType & x.matchType;
 		if (this.ID == x.ID) return (this.matchType & match_________self) == match_________self;
 
@@ -177,14 +197,16 @@ struct SigmarAtom
 			case match__duplication: return (this.matchID | x.matchID) == matchID_________salt;
 			case match___projection:
 			case match____animismus: return this.matchID != x.matchID;
-			// any other case is not x1 valid match
+			// any other case is not a valid match
 			default: return false;
 		}
 	}
 }
 
-struct SigmarSolver
+class SigmarSolver
 {
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	// board data/methods
 	SigmarAtom[] original_board = new SigmarAtom[145];
 	SigmarAtom[] current_board = new SigmarAtom[145];
 	// Each index in the array maps to the following current_board spaces:
@@ -206,7 +228,7 @@ struct SigmarSolver
 	//    133   134   135   136   137   138    139   140   141   142   143
 	// 144
 	//
-	// we include extra empty spaces so it'x4 easy to check a marble'x4 surroundings for other marbles:
+	// we include extra empty spaces so it's easy to check a marble's surroundings for other marbles:
 	//
 	//  -12   -11
 	//     \ /
@@ -224,37 +246,17 @@ struct SigmarSolver
 		return (surroundings << 2 & surroundings << 1 & surroundings) != 0;
 	}
 
-	int[] atomsRemaining;
-
-	public SigmarSolver(Dictionary<HexIndex, AtomType> boardDictionary)
-	{
-		original_board = new SigmarAtom[145];
-		current_board = new SigmarAtom[145];
-		atomsRemaining = new int[SigmarAtom.numberOfAtomIDs];
-
-		for (int i = 0; i < current_board.Length; i++)
-		{
-			original_board[i] = new SigmarAtom();
-			current_board[i] = original_board[i];
-		}
-
-		foreach (var kvp in boardDictionary)
-		{
-			var k = convertToBoardIndex(kvp.Key);
-			var atom = new SigmarAtom(kvp.Value);
-			original_board[k] = atom;
-			current_board[k] = atom;
-			atomsRemaining[atom.ID] += 1;
-		}
-	}
-
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	// misc data/methods
+	int[] remainingAtomsOfType;
+	int atomsLeftOnBoard;
 	void printState()
 	{
 		// print atom counts
 		string str = "";
-		for (int i = 1; i < atomsRemaining.Length; i++)
+		for (int i = 1; i < remainingAtomsOfType.Length; i++)
 		{
-			str += "    " + new SigmarAtom((byte)i).ToString() + " : " + atomsRemaining[i];
+			str += "    " + new SigmarAtom((byte)i).ToString() + " : " + remainingAtomsOfType[i];
 		}
 		Logger.Log(str);
 		// print current_board
@@ -276,6 +278,118 @@ struct SigmarSolver
 		}
 	}
 
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	// constructor
+	public SigmarSolver(Dictionary<HexIndex, AtomType> boardDictionary)
+	{
+		original_board = new SigmarAtom[145];
+		current_board = new SigmarAtom[145];
+
+		for (int i = 0; i < current_board.Length; i++)
+		{
+			original_board[i] = new SigmarAtom();
+			current_board[i] = original_board[i];
+		}
+
+		remainingAtomsOfType = new int[SigmarAtom.numberOfAtomIDs];
+		atomsLeftOnBoard = 0;
+		foreach (var kvp in boardDictionary)
+		{
+			var atom = new SigmarAtom(kvp.Value);
+			if (atom.isEmpty) continue;
+			var k = convertToBoardIndex(kvp.Key);
+			original_board[k] = atom;
+			current_board[k] = atom;
+			remainingAtomsOfType[atom.ID]++;
+			atomsLeftOnBoard++;
+		}
+	}
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Move struct and related data/methods
+	struct Move
+	{
+		public readonly byte x1 = 0, x2 = 0, x3 = 0, x4 = 0, x5 = 0;
+		public readonly byte size = 2;
+		// only possible values for size are be 1, 2 or 5 due to the permitted constructors
+		// additionally, size 2 should be the most common, followed by 1 and then 5
+		// so switches are written to reflect this fact
+		public Move(byte x1)
+		{
+			this.x1 = x1;
+			size = 1;
+		}
+		public Move(byte x1, byte x2)
+		{
+			this.x1 = x1;
+			this.x2 = x2;
+			// size = 2; // already 2 by default
+		}
+		public Move(byte x1, byte x2, byte x3, byte x4, byte x5)
+		{
+			this.x1 = x1;
+			this.x2 = x2;
+			this.x3 = x3;
+			this.x4 = x4;
+			this.x5 = x5;
+			size = 5;
+		}
+		public byte[] getBytes()
+		{
+			switch (size)
+			{
+				case 2: return new byte[2] { x1, x2 };
+				case 1: return new byte[1] { x1 };
+				default: return new byte[5] { x1, x2, x3, x4, x5 };
+			}
+		}
+		public MainClass.SigmarHint GetHint() => new MainClass.SigmarHint(getBytes().Select(x => convertToHexIndex(x)).ToArray());
+
+		public static bool MovesAreEqual(Move M, Move N)
+		{
+			// this equality function is fast, but it is "sloppy"
+			// because it assumes that the indices are sorted so indices[k] >= indices[k+1] for each k
+			// this means that if an index is zero, then the remaining indices are also assumed to be zero
+			if (M.x1 != N.x1 || M.size != N.size) return false;
+			switch (M.size)
+			{
+				case 2: return M.x2 == N.x2;
+				case 1: return true;
+				default: return M.x2 == N.x2 && M.x3 == N.x3 && M.x4 == N.x4 && M.x5 == N.x5;
+			}
+		}
+	}
+
+	Stack<Move> MoveHistory = new();
+	Stack<Move> MovesToCheck = new();
+
+	void MakeMove()
+	{
+		// assumes MovesToCheck is not empty
+		var M = MovesToCheck.Pop();
+		MoveHistory.Push(M);
+		foreach (byte index in M.getBytes())
+		{
+			current_board[index] = new SigmarAtom(SigmarAtom.atom_null);
+			remainingAtomsOfType[original_board[index].ID]--;
+			atomsLeftOnBoard--;
+		}
+	}
+	void UndoMove()
+	{
+		// assumes MoveHistory is not empty
+		var M = MoveHistory.Pop();
+		foreach (byte index in M.getBytes())
+		{
+			var atom = original_board[index];
+			current_board[index] = atom;
+			remainingAtomsOfType[atom.ID]++;
+			atomsLeftOnBoard++;
+		}
+	}
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	// THE SOLVER
 	public MainClass.SigmarHint solveGame()
 	{
 		//
