@@ -2,7 +2,7 @@ Name: SigmarSolver
 Version: 0.0.1
 Icon: sigmarSolver/mod_icon
 Title: Sigmar Solver
-Desc: "A solver for Sigmar's Garden.\n"
+Desc: "A solver for Sigmar's Garden.\n "
 DLL: "SigmarSolver/bin/Debug/net452/SigmarSolver.dll"
 Dependencies:
 - Name: Quintessential

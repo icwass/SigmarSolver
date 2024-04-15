@@ -183,6 +183,7 @@ public class MainClass : QuintessentialMod
 			else
 			{
 				solveGameState(boardDictionary, out sigmarHint, out var finishSound);
+				finishSound.method_28(1f);
 			}
 		}
 
@@ -194,23 +195,24 @@ public class MainClass : QuintessentialMod
 	{
 		// throw different solvers at the problem, each with a different timeout
 		// timeouts have been tweaked to (try to) minimize the time spent solving known-solvable boards
-		finishSound = class_238.field_1991.field_1862; // sim_step sound
 
 		// first, SolverSimple - a basic depth-first search that the other four solvers are based on
+		finishSound = class_238.field_1991.field_1839; // glyph_bonding sound
 		sigmarHint = new SigmarSolver(boardDictionary).solveGame(1);
 		if (!sigmarHint.isEmpty) return;
 
 		// SolverNoDoublecover - avoid making moves that are already planned for later
-		class_238.field_1991.field_1839.method_28(1f); // glyph_bonding sound
+		finishSound = class_238.field_1991.field_1846; // glyph_triplex1 sound
 		sigmarHint = new SigmarSolver(boardDictionary).solveGame(2);
 		if (!sigmarHint.isEmpty) return;
 
 		// SolverMirror - look at possible move-pairs in the reverse order
-		class_238.field_1991.field_1846.method_28(1f); // glyph_triplex1 sound
+		finishSound = class_238.field_1991.field_1849; // glyph_unbonding sound
 		sigmarHint = new SigmarSolver(boardDictionary).solveGame(3);
 		if (!sigmarHint.isEmpty) return;
 
 		// SolverMemoize - keep track of bad board positions and backtrack immediately when we see them
+		finishSound = class_238.field_1991.field_1863; // sim_stop sound
 		class_238.field_1991.field_1842.method_28(1f); // glyph_disposal sound
 		sigmarHint = new SigmarSolver(boardDictionary).solveGame(4);
 		if (!sigmarHint.isEmpty) return;
@@ -218,6 +220,5 @@ public class MainClass : QuintessentialMod
 		// SolverLastChance - SolverSimple but with no time restraints
 		class_238.field_1991.field_1860.method_28(1f); // sim_error sound
 		sigmarHint = new SigmarSolver(boardDictionary).solveGame(0);
-		finishSound = class_238.field_1991.field_1863; // sim_stop sound
 	}
 }
