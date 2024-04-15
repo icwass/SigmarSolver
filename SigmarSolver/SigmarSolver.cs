@@ -34,11 +34,6 @@ public class MainClass : QuintessentialMod
 	public static bool playInOrder = false;
 	static long boardNum = -1;
 
-	public static bool enableSolver1 = true;
-	public static bool enableSolver2 = false;
-	public static bool enableSolver3 = false;
-	public static bool enableSolver4 = false;
-
 	public static bool enableDataLogging = false;
 	public class MySettings
 	{
@@ -52,18 +47,6 @@ public class MainClass : QuintessentialMod
 		[SettingsLabel("Enable data logging in log.txt")]
 		public bool enableDataLogging = false;
 
-		[SettingsLabel("Enable Solver1 (Default solver)")]
-		public bool enableSolver1 = true;
-
-		[SettingsLabel("Enable Solver2 (Avoids making moves that are already planned)")]
-		public bool enableSolver2 = false;
-
-		[SettingsLabel("Enable Solver3 (Keeps track of unsolvable board-positions)")]
-		public bool enableSolver3 = false;
-
-		[SettingsLabel("Enable Solver4 (Generates pairs-to-check in reverse order)")]
-		public bool enableSolver4 = false;
-
 		[SettingsLabel("Show a hint for the current solitaire")]
 		public Keybinding hintKey = new() { Key = "D" };
 	}
@@ -74,17 +57,6 @@ public class MainClass : QuintessentialMod
 		if (!playInOrder) boardNum = -1;
 		playInOrder = SET.playInOrder;
 		enableDataLogging = SET.enableDataLogging;
-		enableSolver1 = SET.enableSolver1;
-		enableSolver2 = SET.enableSolver2;
-		enableSolver3 = SET.enableSolver3;
-		enableSolver4 = SET.enableSolver4;
-
-		if (!enableSolver1 && !enableSolver2 && !enableSolver3 && !enableSolver4)
-		{
-			SET.enableSolver1 = true;
-			enableSolver1 = true;
-			base.ApplySettings();
-		}
 	}
 	public override void Load()
 	{
@@ -210,42 +182,42 @@ public class MainClass : QuintessentialMod
 			}
 			else
 			{
-				var tempHint = SigmarHint.TimeOut;
-				if (enableSolver1)
-				{
-					tempHint = new SigmarSolver(boardDictionary).solveGame(1);
-					if (!tempHint.isEmpty) sigmarHint = tempHint;
-					class_238.field_1991.field_1846.method_28(1f); // glyph_triplex1 sound
-				}
-				if (enableSolver2)
-				{
-					tempHint = new SigmarSolver(boardDictionary).solveGame(2);
-					if (!tempHint.isEmpty) sigmarHint = tempHint;
-					class_238.field_1991.field_1843.method_28(1f); // glyph_duplication sound
-				}
-				if (enableSolver3)
-				{
-					tempHint = new SigmarSolver(boardDictionary).solveGame(3);
-					if (!tempHint.isEmpty) sigmarHint = tempHint;
-					class_238.field_1991.field_1844.method_28(1f); // glyph_projection sound
-				}
-				if (enableSolver4)
-				{
-					tempHint = new SigmarSolver(boardDictionary).solveGame(4);
-					if (!tempHint.isEmpty) sigmarHint = tempHint;
-					class_238.field_1991.field_1847.method_28(1f); // glyph_triplex2 sound
-				}
-				if (sigmarHint.isEmpty)
-				{
-					class_238.field_1991.field_1860.method_28(1f); // sim_error sound
-					sigmarHint = new SigmarSolver(boardDictionary).solveGame(0);
-					class_238.field_1991.field_1863.method_28(1f); // sim_stop sound
-				}
-				if (enableDataLogging) Logger.Log("");
+				solveGameState(boardDictionary, out sigmarHint, out var finishSound);
 			}
 		}
 
 		screen_dyn.Set(HintField, sigmarHint);
 		sigmarHint.drawHint();
+	}
+
+	static void solveGameState(Dictionary<HexIndex, AtomType> boardDictionary, out SigmarHint sigmarHint, out Sound finishSound)
+	{
+		// throw different solvers at the problem, each with a different timeout
+		// timeouts have been tweaked to (try to) minimize the time spent solving known-solvable boards
+		finishSound = class_238.field_1991.field_1862; // sim_step sound
+
+		// first, SolverSimple - a basic depth-first search that the other four solvers are based on
+		sigmarHint = new SigmarSolver(boardDictionary).solveGame(1);
+		if (!sigmarHint.isEmpty) return;
+
+		// SolverNoDoublecover - avoid making moves that are already planned for later
+		class_238.field_1991.field_1839.method_28(1f); // glyph_bonding sound
+		sigmarHint = new SigmarSolver(boardDictionary).solveGame(2);
+		if (!sigmarHint.isEmpty) return;
+
+		// SolverMirror - look at possible move-pairs in the reverse order
+		class_238.field_1991.field_1846.method_28(1f); // glyph_triplex1 sound
+		sigmarHint = new SigmarSolver(boardDictionary).solveGame(3);
+		if (!sigmarHint.isEmpty) return;
+
+		// SolverMemoize - keep track of bad board positions and backtrack immediately when we see them
+		class_238.field_1991.field_1842.method_28(1f); // glyph_disposal sound
+		sigmarHint = new SigmarSolver(boardDictionary).solveGame(4);
+		if (!sigmarHint.isEmpty) return;
+
+		// SolverLastChance - SolverSimple but with no time restraints
+		class_238.field_1991.field_1860.method_28(1f); // sim_error sound
+		sigmarHint = new SigmarSolver(boardDictionary).solveGame(0);
+		finishSound = class_238.field_1991.field_1863; // sim_stop sound
 	}
 }
