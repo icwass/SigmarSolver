@@ -38,8 +38,6 @@ public class MainClass : QuintessentialMod
 	public static bool enableSolver2 = false;
 	public static bool enableSolver3 = false;
 	public static bool enableSolver4 = false;
-	public static bool enableSolver5 = false;
-	public static bool enableSolver6 = false;
 
 	public static bool enableDataLogging = false;
 	public class MySettings
@@ -66,12 +64,6 @@ public class MainClass : QuintessentialMod
 		[SettingsLabel("Enable Solver4 (Generates pairs-to-check in reverse order)")]
 		public bool enableSolver4 = false;
 
-		[SettingsLabel("Enable Solver5 (Generates pairs-to-check from the middle outward)")]
-		public bool enableSolver5 = false;
-
-		[SettingsLabel("Enable Solver6 (Keeps track of unsolvable move-histories)")]
-		public bool enableSolver6 = false;
-
 		[SettingsLabel("Show a hint for the current solitaire")]
 		public Keybinding hintKey = new() { Key = "D" };
 	}
@@ -86,10 +78,8 @@ public class MainClass : QuintessentialMod
 		enableSolver2 = SET.enableSolver2;
 		enableSolver3 = SET.enableSolver3;
 		enableSolver4 = SET.enableSolver4;
-		enableSolver5 = SET.enableSolver5;
-		enableSolver6 = SET.enableSolver6;
 
-		if (!enableSolver1 && !enableSolver2 && !enableSolver3 && !enableSolver4 && !enableSolver5 && !enableSolver6)
+		if (!enableSolver1 && !enableSolver2 && !enableSolver3 && !enableSolver4)
 		{
 			SET.enableSolver1 = true;
 			enableSolver1 = true;
@@ -244,18 +234,6 @@ public class MainClass : QuintessentialMod
 					tempHint = new SigmarSolver(boardDictionary).solveGame(4);
 					if (!tempHint.isEmpty) sigmarHint = tempHint;
 					class_238.field_1991.field_1847.method_28(1f); // glyph_triplex2 sound
-				}
-				if (enableSolver5)
-				{
-					tempHint = new SigmarSolver(boardDictionary).solveGame(5);
-					if (!tempHint.isEmpty) sigmarHint = tempHint;
-					class_238.field_1991.field_1848.method_28(1f); // glyph_triplex3 sound
-				}
-				if (enableSolver6)
-				{
-					tempHint = new SigmarSolver(boardDictionary).solveGame(6);
-					if (!tempHint.isEmpty) sigmarHint = tempHint;
-					class_238.field_1991.field_1845.method_28(1f); // glyph_purification sound
 				}
 				if (sigmarHint.isEmpty)
 				{
